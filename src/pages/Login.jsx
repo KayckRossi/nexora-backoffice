@@ -8,7 +8,7 @@ import { LogIn, Mail, Lock, Loader2, Eye, EyeOff, AlertCircle, Sparkles } from "
 import AuthLayout from "@/components/AuthLayout";
 import { safeReturnTo } from "@/lib/safeReturnTo";
 import { CREDENCIAIS_DEMO } from "@/api/demo/credenciais";
-import { linkErp } from "@/lib/links";
+import { erpConfigurado, linkErp } from "@/lib/links";
 
 export default function Login() {
   const [email, setEmail] = useState("");
@@ -47,7 +47,7 @@ export default function Login() {
       icon={LogIn}
       title="Bem-vindo de volta"
       subtitle="Acesse a retaguarda: caixa, compras, fornecedores e usuários"
-      footer={linkErp() && (
+      footer={erpConfigurado && (
         <p className="text-snow/70 text-sm">
           A conta da empresa é criada no{" "}
           <a href={linkErp("/cadastro")} className="text-pearl font-semibold hover:underline ml-0.5">

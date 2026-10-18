@@ -7,7 +7,7 @@ import Modal from '@/components/Modal';
 import DialogoConfirmacao from '@/components/DialogoConfirmacao';
 import { EstadoConsulta } from '@/components/EstadoConsulta';
 import { useToast } from '@/components/ui/use-toast';
-import { linkErp } from '@/lib/links';
+import { erpConfigurado, linkErp, propsLinkExterno } from '@/lib/links';
 import { useCategorias, useExcluirCategoria, useProdutos, useSalvarCategoria } from '@/api/produtos';
 
 const CORES_SUGERIDAS = ['#339989', '#7DE2D1', '#2A7A6E', '#5CBBB0', '#9AE8DB', '#F4A261', '#E76F51', '#8E7DBE', '#4A90D9', '#B5838D'];
@@ -126,8 +126,8 @@ export default function Categorias() {
                   <div className="flex-1 min-w-0">
                     <p className="text-snow font-medium truncate">{categoria.nome}</p>
                     {/* Os produtos são cadastrados no ERP: o link aparece quando VITE_ERP_URL está definida */}
-                    {linkErp() ? (
-                      <a href={linkErp('/produtos')} className="text-xs text-snow/50 hover:text-pearl inline-flex items-center gap-1">
+                    {erpConfigurado ? (
+                      <a href={linkErp('/produtos')} {...propsLinkExterno} className="text-xs text-snow/50 hover:text-pearl inline-flex items-center gap-1">
                         <Package size={12} /> {quantidade} {quantidade === 1 ? 'produto' : 'produtos'}
                       </a>
                     ) : (
