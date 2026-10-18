@@ -1,3 +1,4 @@
+import { readFileSync } from 'node:fs'
 import { fileURLToPath, URL } from 'node:url'
 import react from '@vitejs/plugin-react'
 import { defineConfig, loadEnv } from 'vite'
@@ -8,6 +9,10 @@ export default defineConfig(({ mode }) => {
   const { API_PROXY_TARGET } = loadEnv(mode, process.cwd(), '');
   const proxy = API_PROXY_TARGET ? { '/api': { target: API_PROXY_TARGET, changeOrigin: true } } : undefined;
 
+  // Cabeçalhos de segurança da produção (vercel.json), aplicados também no `npm run preview`
+  const vercel = JSON.parse(readFileSync(new URL('./vercel.json', import.meta.url), 'utf-8'));
+  const cabecalhos = Object.fromEntries(vercel.headers[0].headers.map(({ key, value }) => [key, value]));
+
   return {
     plugins: [react()],
     resolve: {
@@ -17,7 +22,7 @@ export default defineConfig(({ mode }) => {
     },
     // 5174 para rodar ao lado do ERP & PDV, que usa a porta padrão 5173
     server: { port: 5174, proxy },
-    preview: { port: 4174, proxy },
+    preview: { port: 4174, proxy, headers: cabecalhos },
     test: {
       environment: 'node',
       include: ['src/**/*.test.js'],

@@ -86,6 +86,8 @@ CONTRATO_API_URL=http://localhost:3000 CONTRATO_EMAIL=admin@empresa.com CONTRATO
 
 Em produção (Vercel/Netlify), defina as variáveis no projeto antes do build.
 
+**Segurança no deploy:** o `vercel.json` define os cabeçalhos de segurança (Content-Security-Policy, `X-Frame-Options`, `nosniff`, `Referrer-Policy`), e o `npm run preview` aplica os mesmos para testar localmente. Em outra hospedagem, configure cabeçalhos equivalentes. A CSP só permite chamar a API na mesma origem ou em `https://`; uma API em `http://` de outro endereço exige ajustar o `connect-src`.
+
 ---
 
 ## 📁 Estrutura
