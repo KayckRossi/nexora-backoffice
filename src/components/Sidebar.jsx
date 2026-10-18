@@ -3,7 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { ChevronLeft, ExternalLink, ShoppingCart, X } from 'lucide-react';
 import { useAuth } from '@/lib/AuthContext';
 import { ROTAS_BACKOFFICE } from '@/lib/rotas';
-import { linkErp } from '@/lib/links';
+import { erpConfigurado, linkErp, propsLinkExterno } from '@/lib/links';
 
 // Agrupa as telas do backoffice (src/lib/rotas.js); cada item só aparece para perfis com a permissão
 const GRUPOS = ROTAS_BACKOFFICE.reduce((grupos, rota) => {
@@ -96,10 +96,11 @@ export default function Sidebar({ collapsed, mobileOpen, onCloseMobile, onToggle
       </nav>
 
       {/* Atalho para o ERP & PDV (outro app), quando VITE_ERP_URL está definida */}
-      {linkErp() && (
+      {erpConfigurado && (
         <a
           href={linkErp()}
-          title="Abrir o ERP & PDV"
+          {...propsLinkExterno}
+          title="Abrir o ERP & PDV em outra aba"
           className={`flex items-center gap-3 mx-3 mb-3 py-2.5 rounded-lg text-snow/70 hover:text-snow hover:bg-graphite-hover transition-colors ${collapsed ? 'justify-center px-0' : 'px-3'}`}
         >
           <ShoppingCart size={20} className="shrink-0" />
