@@ -20,8 +20,11 @@ export default defineConfig(({ mode }) => {
   const proxy = env.API_PROXY_TARGET
     ? { "/api": { target: env.API_PROXY_TARGET, changeOrigin: true, secure: false } }
     : undefined;
+  // BASE_PATH=/admin/ publica o backoffice num subcaminho (ex.: atrás do ERP, no mesmo link do ngrok)
+  const base = `/${(env.BASE_PATH || "").replace(/^\/+|\/+$/g, "")}/`.replace("//", "/");
 
   return {
+    base,
     // Portas vizinhas às do ERP (8080 e 4173), para os dois rodarem juntos
     server: {
       host: "::",
