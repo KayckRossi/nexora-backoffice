@@ -2,7 +2,6 @@ import { defineConfig, loadEnv } from "vite";
 import react from "@vitejs/plugin-react-swc";
 import path from "path";
 import { readFileSync } from "fs";
-import { componentTagger } from "lovable-tagger";
 
 // Domínios de túnel aceitos pelo servidor de dev/preview (ngrok); o resto é bloqueado pelo Vite
 const HOSTS_TUNEL = [".ngrok-free.app", ".ngrok.app", ".ngrok.io", ".ngrok-free.dev"];
@@ -40,7 +39,7 @@ export default defineConfig(({ mode }) => {
       headers: CABECALHOS_SEGURANCA,
       proxy,
     },
-    plugins: [react(), mode === "development" && componentTagger()].filter(Boolean),
+    plugins: [react()],
     resolve: {
       alias: {
         "@": path.resolve(__dirname, "./src"),
