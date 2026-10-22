@@ -1,5 +1,6 @@
 import { useState } from "react";
-import { NavLink, useLocation } from "react-router-dom";
+import { NavLink, useLocation, useNavigate } from "react-router-dom";
+import { useQueryClient } from "@tanstack/react-query";
 import {
   LayoutDashboard,
   Building2,
@@ -15,6 +16,7 @@ import {
   X,
 } from "lucide-react";
 import { useIsMobile } from "@/hooks/use-mobile";
+import { sair, useUsuarioAtual } from "@/lib/auth";
 
 const itensNavegacao = [
   { para: "/", icone: LayoutDashboard, rotulo: "Dashboard" },
@@ -27,15 +29,41 @@ const itensNavegacao = [
   { para: "/despesas", icone: Wallet, rotulo: "Gastos" },
 ];
 
-interface BarraLateralProps {
-  aoSair?: () => void;
-}
+const rotulosPapel: Record<string, string> = {
+  superadmin: "Super Admin",
+  admin: "Admin",
+  suporte: "Suporte",
+  financeiro: "Financeiro",
+};
 
-export default function BarraLateral({ aoSair }: BarraLateralProps) {
+export default function BarraLateral() {
   const [sobMouse, setSobMouse] = useState(false);
   const [menuMobileAberto, setMenuMobileAberto] = useState(false);
   const localizacao = useLocation();
+  const navegar = useNavigate();
+  const clienteConsulta = useQueryClient();
+  const { data: usuario } = useUsuarioAtual();
   const eMobile = useIsMobile();
+
+  const aoSair = async () => {
+    await sair(clienteConsulta);
+    navegar("/login", { replace: true });
+  };
+
+  const iniciais = (usuario?.nome ?? "?").split(" ").map((n) => n[0]).join("").slice(0, 2).toUpperCase();
+  const identificacao = (comTexto: boolean) => (
+    <div className="flex items-center gap-3 px-3 py-2">
+      <div className="w-8 h-8 rounded-full bg-muted flex items-center justify-center flex-shrink-0">
+        <span className="text-xs font-bold text-foreground">{iniciais}</span>
+      </div>
+      {comTexto && (
+        <div className="min-w-0 overflow-hidden whitespace-nowrap">
+          <p className="text-sm font-medium text-foreground truncate">{usuario?.nome ?? "..."}</p>
+          <p className="text-[10px] text-muted-foreground truncate">{usuario ? rotulosPapel[usuario.papel] ?? usuario.papel : ""}</p>
+        </div>
+      )}
+    </div>
+  );
 
   if (eMobile) {
     return (
@@ -90,17 +118,16 @@ export default function BarraLateral({ aoSair }: BarraLateralProps) {
                 })}
               </nav>
 
-              {aoSair && (
-                <div className="px-3 pb-4">
-                  <button
-                    onClick={aoSair}
-                    className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-sidebar-foreground hover:bg-destructive/10 hover:text-destructive transition-colors"
-                  >
-                    <LogOut className="w-4 h-4 flex-shrink-0" />
-                    <span>Sair</span>
-                  </button>
-                </div>
-              )}
+              <div className="px-3 pb-4 space-y-1">
+                {identificacao(true)}
+                <button
+                  onClick={aoSair}
+                  className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-sidebar-foreground hover:bg-destructive/10 hover:text-destructive transition-colors"
+                >
+                  <LogOut className="w-4 h-4 flex-shrink-0" />
+                  <span>Sair</span>
+                </button>
+              </div>
             </aside>
           </>
         )}
@@ -149,16 +176,15 @@ export default function BarraLateral({ aoSair }: BarraLateralProps) {
         })}
       </nav>
 
-      <div className="px-3 pb-4">
-        {aoSair && (
-          <button
-            onClick={aoSair}
-            className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-sidebar-foreground hover:bg-destructive/10 hover:text-destructive transition-colors"
-          >
-            <LogOut className="w-4 h-4 flex-shrink-0" />
-            {expandido && <span className="whitespace-nowrap">Sair</span>}
-          </button>
-        )}
+      <div className="px-3 pb-4 space-y-1">
+        {identificacao(expandido)}
+        <button
+          onClick={aoSair}
+          className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-sidebar-foreground hover:bg-destructive/10 hover:text-destructive transition-colors"
+        >
+          <LogOut className="w-4 h-4 flex-shrink-0" />
+          {expandido && <span className="whitespace-nowrap">Sair</span>}
+        </button>
       </div>
     </aside>
   );

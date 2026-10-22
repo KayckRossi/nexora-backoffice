@@ -234,6 +234,7 @@ const ChartLegendContent = React.forwardRef<
     hideIcon?: boolean;
     nameKey?: string;
   }
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
 >(({ className, hideIcon = false, payload, verticalAlign = "bottom", nameKey }: any, ref: any) => {
   const { config } = useChart();
 

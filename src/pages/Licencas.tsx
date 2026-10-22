@@ -1,19 +1,23 @@
 import { Users, Building2, AlertTriangle } from "lucide-react";
 import CartaoEstatistica from "@/components/CartaoEstatistica";
-import { inquilinos, planos } from "@/data/dadosMock";
+import { useInquilinos, usePlanos } from "@/api/recursos";
+import EstadoTabela from "@/components/EstadoTabela";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import BadgeStatus from "@/components/BadgeStatus";
 
 export default function Licencas() {
+  const { data: inquilinos = [], isLoading, error } = useInquilinos();
+  const { data: planos = [] } = usePlanos();
+
   const dadosLicenca = inquilinos.map((i) => {
-    const plano = planos.find((p) => p.id === i.planoId)!;
+    const plano = planos.find((p) => p.id === i.planoId);
     return {
       ...i,
-      nomePlano: plano.nome,
-      precoPlano: plano.preco,
-      percentualUso: Math.round((i.qtdUsuarios / i.maxUsuarios) * 100),
+      nomePlano: plano?.nome ?? i.planoId,
+      precoPlano: plano?.preco ?? 0,
+      percentualUso: i.maxUsuarios ? Math.round((i.qtdUsuarios / i.maxUsuarios) * 100) : 0,
     };
   });
 
@@ -31,7 +35,7 @@ export default function Licencas() {
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
         <CartaoEstatistica titulo="Total de Assentos" valor={totalAssentos} icone={Users} gradiente />
         <CartaoEstatistica titulo="Assentos Utilizados" valor={assentosUsados} icone={Users} />
-        <CartaoEstatistica titulo="Taxa de Ocupação" valor={`${Math.round((assentosUsados / totalAssentos) * 100)}%`} icone={Building2} />
+        <CartaoEstatistica titulo="Taxa de Ocupação" valor={`${totalAssentos ? Math.round((assentosUsados / totalAssentos) * 100) : 0}%`} icone={Building2} />
         <CartaoEstatistica titulo="Alta Utilização (>80%)" valor={altoUso} icone={AlertTriangle} />
       </div>
 
@@ -80,6 +84,7 @@ export default function Licencas() {
             </TableRow>
           </TableHeader>
           <TableBody>
+            <EstadoTabela colunas={5} carregando={isLoading} erro={error} vazio={dadosLicenca.length === 0} />
             {dadosLicenca.map((d) => (
               <TableRow key={d.id} className="border-border/30 hover:bg-muted/30">
                 <TableCell className="text-sm font-medium text-foreground">{d.nome}</TableCell>

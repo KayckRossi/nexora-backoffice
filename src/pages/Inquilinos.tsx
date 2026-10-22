@@ -1,6 +1,8 @@
 import { useState } from "react";
 import { Building2, Plus, Search, MoreHorizontal, Ban, CheckCircle } from "lucide-react";
-import { inquilinos, planos } from "@/data/dadosMock";
+import { useAlterarStatus, useCriar, useInquilinos, usePlanos, type NovoInquilino } from "@/api/recursos";
+import EstadoTabela from "@/components/EstadoTabela";
+import { formatarData } from "@/lib/formatos";
 import BadgeStatus from "@/components/BadgeStatus";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Input } from "@/components/ui/input";
@@ -17,10 +19,31 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 
+const FORMULARIO_VAZIO: NovoInquilino = { nome: "", cnpj: "", emailContato: "", telefoneContato: "", planoId: "" };
+
 export default function Inquilinos() {
   const [busca, setBusca] = useState("");
   const [dialogAberto, setDialogAberto] = useState(false);
+  const [formulario, setFormulario] = useState<NovoInquilino>(FORMULARIO_VAZIO);
   const { toast } = useToast();
+  const { data: inquilinos = [], isLoading, error } = useInquilinos();
+  const { data: planos = [] } = usePlanos();
+  const criar = useCriar("inquilinos");
+  const alterarStatus = useAlterarStatus("inquilinos");
+
+  const campo = (nome: keyof NovoInquilino) => ({
+    value: formulario[nome] ?? "",
+    onChange: (e: React.ChangeEvent<HTMLInputElement>) => setFormulario({ ...formulario, [nome]: e.target.value }),
+  });
+
+  const aoCriar = () =>
+    criar.mutate(formulario, {
+      onSuccess: () => {
+        setDialogAberto(false);
+        setFormulario(FORMULARIO_VAZIO);
+        toast({ title: "Tenant criado com sucesso", description: `${formulario.nome} foi adicionado ao sistema.` });
+      },
+    });
 
   const filtrados = inquilinos.filter(
     (i) =>
@@ -50,23 +73,23 @@ export default function Inquilinos() {
             <div className="space-y-4 pt-4">
               <div className="space-y-2">
                 <Label className="text-muted-foreground text-xs">Nome da Empresa</Label>
-                <Input placeholder="Ex: Empresa XPTO" className="bg-muted border-border text-foreground" />
+                <Input {...campo("nome")} placeholder="Ex: Empresa XPTO" className="bg-muted border-border text-foreground" />
               </div>
               <div className="space-y-2">
                 <Label className="text-muted-foreground text-xs">CNPJ</Label>
-                <Input placeholder="00.000.000/0000-00" className="bg-muted border-border text-foreground" />
+                <Input {...campo("cnpj")} placeholder="00.000.000/0000-00" className="bg-muted border-border text-foreground" />
               </div>
               <div className="space-y-2">
                 <Label className="text-muted-foreground text-xs">Email de Contato</Label>
-                <Input placeholder="admin@empresa.com" className="bg-muted border-border text-foreground" />
+                <Input {...campo("emailContato")} type="email" placeholder="admin@empresa.com" className="bg-muted border-border text-foreground" />
               </div>
               <div className="space-y-2">
                 <Label className="text-muted-foreground text-xs">Telefone</Label>
-                <Input placeholder="(00) 00000-0000" className="bg-muted border-border text-foreground" />
+                <Input {...campo("telefoneContato")} placeholder="(00) 00000-0000" className="bg-muted border-border text-foreground" />
               </div>
               <div className="space-y-2">
                 <Label className="text-muted-foreground text-xs">Plano</Label>
-                <Select>
+                <Select value={formulario.planoId} onValueChange={(planoId) => setFormulario({ ...formulario, planoId })}>
                   <SelectTrigger className="bg-muted border-border text-foreground">
                     <SelectValue placeholder="Selecione um plano" />
                   </SelectTrigger>
@@ -81,12 +104,10 @@ export default function Inquilinos() {
               </div>
               <Button
                 className="w-full gradient-primary text-primary-foreground border-0"
-                onClick={() => {
-                  setDialogAberto(false);
-                  toast({ title: "Tenant criado com sucesso", description: "O novo tenant foi adicionado ao sistema." });
-                }}
+                disabled={criar.isPending}
+                onClick={aoCriar}
               >
-                Criar Tenant
+                {criar.isPending ? "Criando..." : "Criar Tenant"}
               </Button>
             </div>
           </DialogContent>
@@ -117,6 +138,7 @@ export default function Inquilinos() {
             </TableRow>
           </TableHeader>
           <TableBody>
+            <EstadoTabela colunas={7} carregando={isLoading} erro={error} vazio={filtrados.length === 0} />
             {filtrados.map((i) => {
               const plano = obterPlano(i.planoId);
               return (
@@ -134,7 +156,7 @@ export default function Inquilinos() {
                   </TableCell>
                   <TableCell>
                     <Badge variant="outline" className="text-xs border-border text-muted-foreground">
-                      {plano?.nome}
+                      {plano?.nome ?? i.planoId}
                     </Badge>
                   </TableCell>
                   <TableCell>
@@ -143,7 +165,7 @@ export default function Inquilinos() {
                   </TableCell>
                   <TableCell className="text-xs text-muted-foreground">{i.emailContato}</TableCell>
                   <TableCell className="text-xs text-muted-foreground">
-                    {new Date(i.criadoEm).toLocaleDateString("pt-BR")}
+                    {formatarData(i.criadoEm)}
                   </TableCell>
                   <TableCell><BadgeStatus status={i.status} /></TableCell>
                   <TableCell>
@@ -155,11 +177,17 @@ export default function Inquilinos() {
                       </DropdownMenuTrigger>
                       <DropdownMenuContent align="end" className="bg-card border-border">
                         {i.status === "ativo" ? (
-                          <DropdownMenuItem className="text-destructive focus:text-destructive">
+                          <DropdownMenuItem
+                            className="text-destructive focus:text-destructive"
+                            onClick={() => alterarStatus.mutate({ id: i.id, status: "suspenso" })}
+                          >
                             <Ban className="w-4 h-4 mr-2" /> Suspender Tenant
                           </DropdownMenuItem>
                         ) : (
-                          <DropdownMenuItem className="text-success focus:text-success">
+                          <DropdownMenuItem
+                            className="text-success focus:text-success"
+                            onClick={() => alterarStatus.mutate({ id: i.id, status: "ativo" })}
+                          >
                             <CheckCircle className="w-4 h-4 mr-2" /> Reativar Tenant
                           </DropdownMenuItem>
                         )}

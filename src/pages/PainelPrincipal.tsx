@@ -1,20 +1,24 @@
-import { Building2, Users, Activity, Receipt, AlertTriangle, TrendingUp } from "lucide-react";
+import { Building2, Users, AlertTriangle, TrendingUp } from "lucide-react";
 import CartaoEstatistica from "@/components/CartaoEstatistica";
 import BadgeStatus from "@/components/BadgeStatus";
-import { inquilinos, usuarios, registrosAuditoria } from "@/data/dadosMock";
+import { useAuditoria, useInquilinos, usePlanos, useUsuarios } from "@/api/recursos";
+import EstadoTabela from "@/components/EstadoTabela";
+import { formatarData, formatarMoeda } from "@/lib/formatos";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 
 export default function PainelPrincipal() {
+  const { data: inquilinos = [], isLoading: carregandoInquilinos, error: erroInquilinos } = useInquilinos();
+  const { data: usuarios = [] } = useUsuarios();
+  const { data: planos = [] } = usePlanos();
+  const { data: registrosAuditoria = [], isLoading: carregandoAuditoria, error: erroAuditoria } = useAuditoria();
+
   const inquilinosAtivos = inquilinos.filter((i) => i.status === "ativo").length;
   const totalUsuarios = usuarios.length;
   const usuariosAtivos = usuarios.filter((u) => u.status === "ativo").length;
   const inquilinosSuspensos = inquilinos.filter((i) => i.status === "suspenso").length;
   const mrr = inquilinos
     .filter((i) => i.status === "ativo")
-    .reduce((acc, i) => {
-      const precos: Record<string, number> = { starter: 99, professional: 299, enterprise: 799 };
-      return acc + (precos[i.planoId] || 0);
-    }, 0);
+    .reduce((acc, i) => acc + (planos.find((p) => p.id === i.planoId)?.preco ?? 0), 0);
 
   return (
     <div className="space-y-8 animate-fade-in">
@@ -24,9 +28,9 @@ export default function PainelPrincipal() {
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-        <CartaoEstatistica titulo="Tenants Ativos" valor={inquilinosAtivos} icone={Building2} gradiente tendencia={{ valor: "+2 este mês", positivo: true }} />
-        <CartaoEstatistica titulo="Usuários Totais" valor={totalUsuarios} subtitulo={`${usuariosAtivos} ativos`} icone={Users} tendencia={{ valor: "+12%", positivo: true }} />
-        <CartaoEstatistica titulo="MRR" valor={`R$ ${mrr.toLocaleString("pt-BR")}`} icone={TrendingUp} tendencia={{ valor: "+8.5%", positivo: true }} />
+        <CartaoEstatistica titulo="Tenants Ativos" valor={inquilinosAtivos} icone={Building2} gradiente />
+        <CartaoEstatistica titulo="Usuários Totais" valor={totalUsuarios} subtitulo={`${usuariosAtivos} ativos`} icone={Users} />
+        <CartaoEstatistica titulo="MRR" valor={formatarMoeda(mrr)} icone={TrendingUp} />
         <CartaoEstatistica titulo="Alertas" valor={inquilinosSuspensos} subtitulo="tenants suspensos" icone={AlertTriangle} />
       </div>
 
@@ -43,6 +47,7 @@ export default function PainelPrincipal() {
             </TableRow>
           </TableHeader>
           <TableBody>
+            <EstadoTabela colunas={5} carregando={carregandoAuditoria} erro={erroAuditoria} vazio={registrosAuditoria.length === 0} />
             {registrosAuditoria.slice(0, 5).map((registro) => (
               <TableRow key={registro.id} className="border-border/30 hover:bg-muted/30">
                 <TableCell className="text-xs font-mono text-primary">{registro.acao}</TableCell>
@@ -50,7 +55,7 @@ export default function PainelPrincipal() {
                 <TableCell className="text-xs text-foreground">{registro.alvo}</TableCell>
                 <TableCell className="text-xs text-muted-foreground">{registro.nomeInquilino}</TableCell>
                 <TableCell className="text-xs text-muted-foreground">
-                  {new Date(registro.dataHora).toLocaleDateString("pt-BR")}
+                  {formatarData(registro.dataHora)}
                 </TableCell>
               </TableRow>
             ))}
@@ -70,10 +75,11 @@ export default function PainelPrincipal() {
             </TableRow>
           </TableHeader>
           <TableBody>
+            <EstadoTabela colunas={4} carregando={carregandoInquilinos} erro={erroInquilinos} vazio={inquilinos.length === 0} />
             {inquilinos.map((i) => (
               <TableRow key={i.id} className="border-border/30 hover:bg-muted/30">
                 <TableCell className="text-sm font-medium text-foreground">{i.nome}</TableCell>
-                <TableCell className="text-xs text-muted-foreground capitalize">{i.planoId}</TableCell>
+                <TableCell className="text-xs text-muted-foreground">{planos.find((p) => p.id === i.planoId)?.nome ?? i.planoId}</TableCell>
                 <TableCell className="text-xs text-foreground">
                   {i.qtdUsuarios}/{i.maxUsuarios}
                 </TableCell>

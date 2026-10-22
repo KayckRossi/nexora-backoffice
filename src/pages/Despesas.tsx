@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { DollarSign, Server, Cloud, Code, Headphones, Plus, TrendingDown } from "lucide-react";
+import { DollarSign, Server, Cloud, Code, Headphones, Plus, TrendingDown, MoreHorizontal, Ban, CheckCircle } from "lucide-react";
 import CartaoEstatistica from "@/components/CartaoEstatistica";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
@@ -9,7 +9,10 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
-import { despesas } from "@/data/dadosMock";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import { useAlterarStatus, useCriar, useDespesas, type NovaDespesa } from "@/api/recursos";
+import EstadoTabela from "@/components/EstadoTabela";
+import { formatarMoeda } from "@/lib/formatos";
 
 const iconesCategorias: Record<string, React.ElementType> = {
   infraestrutura: Server,
@@ -35,10 +38,29 @@ const coresCategorias: Record<string, string> = {
   outros: "bg-muted text-muted-foreground border-border",
 };
 
+// Categoria começa vazia e o custo é texto até o envio; o backend valida os dois (422)
+type Formulario = Omit<NovaDespesa, "categoria" | "custoMensal"> & { categoria: NovaDespesa["categoria"] | ""; custoMensal: string };
+const FORMULARIO_VAZIO: Formulario = { descricao: "", categoria: "", custoMensal: "", fornecedor: "", observacoes: "" };
+
 export default function Despesas() {
   const [dialogAberto, setDialogAberto] = useState(false);
+  const [formulario, setFormulario] = useState<Formulario>(FORMULARIO_VAZIO);
   const { toast } = useToast();
+  const { data: todas = [], isLoading, error } = useDespesas();
+  const criar = useCriar("despesas");
+  const alterarStatus = useAlterarStatus("despesas");
 
+  const aoCriar = () =>
+    criar.mutate({ ...formulario, custoMensal: Number(formulario.custoMensal.replace(",", ".")) } as NovaDespesa, {
+      onSuccess: () => {
+        setDialogAberto(false);
+        setFormulario(FORMULARIO_VAZIO);
+        toast({ title: "Gasto registrado", description: `${formulario.descricao} foi adicionado.` });
+      },
+    });
+
+  // Os totais consideram só os gastos ativos; os cancelados continuam na tabela
+  const despesas = todas.filter((d) => d.status === "ativo");
   const totalMensal = despesas.reduce((acc, d) => acc + d.custoMensal, 0);
   const totalAnual = totalMensal * 12;
   const categorias = [...new Set(despesas.map((d) => d.categoria))];
@@ -59,8 +81,8 @@ export default function Despesas() {
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-        <CartaoEstatistica titulo="Custo Mensal Total" valor={`R$ ${totalMensal.toLocaleString("pt-BR")}`} icone={DollarSign} gradiente />
-        <CartaoEstatistica titulo="Custo Anual Projetado" valor={`R$ ${totalAnual.toLocaleString("pt-BR")}`} icone={TrendingDown} />
+        <CartaoEstatistica titulo="Custo Mensal Total" valor={formatarMoeda(totalMensal)} icone={DollarSign} gradiente />
+        <CartaoEstatistica titulo="Custo Anual Projetado" valor={formatarMoeda(totalAnual)} icone={TrendingDown} />
         <CartaoEstatistica titulo="Itens de Custo" valor={despesas.length} icone={Server} />
         <CartaoEstatistica titulo="Maior Categoria" valor={rotulosCategorias[maiorCategoria?.categoria || "outros"]} icone={Cloud} />
       </div>
@@ -78,7 +100,7 @@ export default function Despesas() {
                   {rotulosCategorias[cat]}
                 </h3>
               </div>
-              <p className="text-2xl font-bold text-foreground">R$ {totalCategoria.toLocaleString("pt-BR")}</p>
+              <p className="text-2xl font-bold text-foreground">{formatarMoeda(totalCategoria)}</p>
               <p className="text-xs text-muted-foreground mt-1">{despesasDaCategoria.length} itens • {((totalCategoria / totalMensal) * 100).toFixed(0)}% do total</p>
             </div>
           );
@@ -97,10 +119,12 @@ export default function Despesas() {
               <TableHead className="text-muted-foreground text-xs">Fornecedor</TableHead>
               <TableHead className="text-muted-foreground text-xs">Custo/Mês</TableHead>
               <TableHead className="text-muted-foreground text-xs">Status</TableHead>
+              <TableHead className="text-muted-foreground text-xs w-10"></TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
-            {despesas.map((d) => (
+            <EstadoTabela colunas={6} carregando={isLoading} erro={error} vazio={todas.length === 0} />
+            {todas.map((d) => (
               <TableRow key={d.id} className="border-border/30 hover:bg-muted/30">
                 <TableCell>
                   <p className="text-sm font-medium text-foreground">{d.descricao}</p>
@@ -112,7 +136,7 @@ export default function Despesas() {
                   </Badge>
                 </TableCell>
                 <TableCell className="text-xs text-muted-foreground">{d.fornecedor}</TableCell>
-                <TableCell className="text-sm font-bold text-foreground">R$ {d.custoMensal.toLocaleString("pt-BR")}</TableCell>
+                <TableCell className="text-sm font-bold text-foreground">{formatarMoeda(d.custoMensal)}</TableCell>
                 <TableCell>
                   <Badge variant="outline" className={
                     d.status === "ativo"
@@ -121,6 +145,32 @@ export default function Despesas() {
                   }>
                     {d.status === "ativo" ? "Ativo" : "Cancelado"}
                   </Badge>
+                </TableCell>
+                <TableCell>
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-foreground">
+                        <MoreHorizontal className="w-4 h-4" />
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end" className="bg-card border-border">
+                      {d.status === "ativo" ? (
+                        <DropdownMenuItem
+                          className="text-destructive focus:text-destructive"
+                          onClick={() => alterarStatus.mutate({ id: d.id, status: "cancelado" })}
+                        >
+                          <Ban className="w-4 h-4 mr-2" /> Cancelar Gasto
+                        </DropdownMenuItem>
+                      ) : (
+                        <DropdownMenuItem
+                          className="text-success focus:text-success"
+                          onClick={() => alterarStatus.mutate({ id: d.id, status: "ativo" })}
+                        >
+                          <CheckCircle className="w-4 h-4 mr-2" /> Reativar Gasto
+                        </DropdownMenuItem>
+                      )}
+                    </DropdownMenuContent>
+                  </DropdownMenu>
                 </TableCell>
               </TableRow>
             ))}
@@ -137,12 +187,12 @@ export default function Despesas() {
           <div className="space-y-4 pt-2">
             <div className="space-y-2">
               <Label className="text-muted-foreground text-xs">Descrição</Label>
-              <Input placeholder="Ex: Servidor AWS" className="bg-muted border-border text-foreground" />
+              <Input value={formulario.descricao} onChange={(e) => setFormulario({ ...formulario, descricao: e.target.value })} placeholder="Ex: Servidor AWS" className="bg-muted border-border text-foreground" />
             </div>
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-2">
                 <Label className="text-muted-foreground text-xs">Categoria</Label>
-                <Select>
+                <Select value={formulario.categoria} onValueChange={(categoria) => setFormulario({ ...formulario, categoria: categoria as Formulario["categoria"] })}>
                   <SelectTrigger className="bg-muted border-border text-foreground">
                     <SelectValue placeholder="Selecione" />
                   </SelectTrigger>
@@ -157,21 +207,19 @@ export default function Despesas() {
               </div>
               <div className="space-y-2">
                 <Label className="text-muted-foreground text-xs">Custo Mensal (R$)</Label>
-                <Input type="number" placeholder="0,00" className="bg-muted border-border text-foreground" />
+                <Input type="number" min="0" step="0.01" value={formulario.custoMensal} onChange={(e) => setFormulario({ ...formulario, custoMensal: e.target.value })} placeholder="0,00" className="bg-muted border-border text-foreground" />
               </div>
             </div>
             <div className="space-y-2">
               <Label className="text-muted-foreground text-xs">Fornecedor</Label>
-              <Input placeholder="Ex: Amazon Web Services" className="bg-muted border-border text-foreground" />
+              <Input value={formulario.fornecedor} onChange={(e) => setFormulario({ ...formulario, fornecedor: e.target.value })} placeholder="Ex: Amazon Web Services" className="bg-muted border-border text-foreground" />
             </div>
             <Button
               className="w-full gradient-primary text-primary-foreground border-0"
-              onClick={() => {
-                setDialogAberto(false);
-                toast({ title: "Gasto registrado", description: "O novo custo foi adicionado com sucesso." });
-              }}
+              disabled={criar.isPending}
+              onClick={aoCriar}
             >
-              Registrar Gasto
+              {criar.isPending ? "Registrando..." : "Registrar Gasto"}
             </Button>
           </div>
         </DialogContent>

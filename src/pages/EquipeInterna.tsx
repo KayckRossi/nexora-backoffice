@@ -1,6 +1,9 @@
 import { useState } from "react";
 import { Search, MoreHorizontal, Ban, CheckCircle, KeyRound, UserPlus, Shield } from "lucide-react";
-import { usuariosInternos } from "@/data/dadosMock";
+import { useAlterarStatus, useCriar, useEquipe, useRedefinirSenha, type NovoColaborador } from "@/api/recursos";
+import EstadoTabela from "@/components/EstadoTabela";
+import { podeGerenciarEquipe, useUsuarioAtual } from "@/lib/auth";
+import { formatarDataHora } from "@/lib/formatos";
 import BadgeStatus from "@/components/BadgeStatus";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Input } from "@/components/ui/input";
@@ -24,12 +27,32 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 
+// Cargo começa vazio até ser escolhido; o backend recusa (422) se continuar vazio
+type Formulario = Omit<NovoColaborador, "papel"> & { papel: NovoColaborador["papel"] | "" };
+const FORMULARIO_VAZIO: Formulario = { nome: "", email: "", papel: "", departamento: "" };
+
 export default function EquipeInterna() {
   const [busca, setBusca] = useState("");
   const [dialogAberto, setDialogAberto] = useState(false);
+  const [formulario, setFormulario] = useState<Formulario>(FORMULARIO_VAZIO);
   const { toast } = useToast();
+  const { data: equipe = [], isLoading, error } = useEquipe();
+  const { data: eu } = useUsuarioAtual();
+  const podeGerenciar = podeGerenciarEquipe(eu);
+  const criar = useCriar("equipe");
+  const alterarStatus = useAlterarStatus("equipe");
+  const redefinirSenha = useRedefinirSenha("equipe");
 
-  const filtrados = usuariosInternos.filter(
+  const aoCriar = () =>
+    criar.mutate(formulario as NovoColaborador, {
+      onSuccess: () => {
+        setDialogAberto(false);
+        setFormulario(FORMULARIO_VAZIO);
+        toast({ title: "Colaborador criado", description: `${formulario.email} foi adicionado à equipe.` });
+      },
+    });
+
+  const filtrados = equipe.filter(
     (u) =>
       u.nome.toLowerCase().includes(busca.toLowerCase()) ||
       u.email.toLowerCase().includes(busca.toLowerCase())
@@ -49,9 +72,11 @@ export default function EquipeInterna() {
           <h1 className="text-2xl font-bold text-foreground">Equipe Interna</h1>
           <p className="text-sm text-muted-foreground mt-1">Gerencie os colaboradores do NexoHub</p>
         </div>
-        <Button className="gradient-primary text-primary-foreground border-0" onClick={() => setDialogAberto(true)}>
-          <UserPlus className="w-4 h-4 mr-2" /> Novo Colaborador
-        </Button>
+        {podeGerenciar && (
+          <Button className="gradient-primary text-primary-foreground border-0" onClick={() => setDialogAberto(true)}>
+            <UserPlus className="w-4 h-4 mr-2" /> Novo Colaborador
+          </Button>
+        )}
       </div>
 
       <div className="relative">
@@ -77,6 +102,7 @@ export default function EquipeInterna() {
             </TableRow>
           </TableHeader>
           <TableBody>
+            <EstadoTabela colunas={6} carregando={isLoading} erro={error} vazio={filtrados.length === 0} />
             {filtrados.map((u) => (
               <TableRow key={u.id} className="border-border/30 hover:bg-muted/30">
                 <TableCell>
@@ -100,32 +126,40 @@ export default function EquipeInterna() {
                 </TableCell>
                 <TableCell className="text-xs text-muted-foreground">{u.departamento}</TableCell>
                 <TableCell className="text-xs text-muted-foreground">
-                  {new Date(u.ultimoLogin).toLocaleString("pt-BR")}
+                  {formatarDataHora(u.ultimoLogin, "Nunca")}
                 </TableCell>
                 <TableCell><BadgeStatus status={u.status} /></TableCell>
                 <TableCell>
-                  <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                      <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-foreground">
-                        <MoreHorizontal className="w-4 h-4" />
-                      </Button>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent align="end" className="bg-card border-border">
-                      <DropdownMenuItem onClick={() => toast({ title: "Reset enviado", description: `Email de reset enviado para ${u.email}` })}>
-                        <KeyRound className="w-4 h-4 mr-2" /> Reset de Senha
-                      </DropdownMenuItem>
-                      <DropdownMenuSeparator className="bg-border" />
-                      {u.status === "ativo" ? (
-                        <DropdownMenuItem className="text-destructive focus:text-destructive">
-                          <Ban className="w-4 h-4 mr-2" /> Desativar
+                  {podeGerenciar && (
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-foreground">
+                          <MoreHorizontal className="w-4 h-4" />
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end" className="bg-card border-border">
+                        <DropdownMenuItem onClick={() => redefinirSenha.mutate(u)}>
+                          <KeyRound className="w-4 h-4 mr-2" /> Reset de Senha
                         </DropdownMenuItem>
-                      ) : (
-                        <DropdownMenuItem className="text-success focus:text-success">
-                          <CheckCircle className="w-4 h-4 mr-2" /> Reativar
-                        </DropdownMenuItem>
-                      )}
-                    </DropdownMenuContent>
-                  </DropdownMenu>
+                        {u.id !== eu?.id && <DropdownMenuSeparator className="bg-border" />}
+                        {u.id === eu?.id ? null : u.status === "ativo" ? (
+                          <DropdownMenuItem
+                            className="text-destructive focus:text-destructive"
+                            onClick={() => alterarStatus.mutate({ id: u.id, status: "suspenso" })}
+                          >
+                            <Ban className="w-4 h-4 mr-2" /> Desativar
+                          </DropdownMenuItem>
+                        ) : (
+                          <DropdownMenuItem
+                            className="text-success focus:text-success"
+                            onClick={() => alterarStatus.mutate({ id: u.id, status: "ativo" })}
+                          >
+                            <CheckCircle className="w-4 h-4 mr-2" /> Reativar
+                          </DropdownMenuItem>
+                        )}
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                  )}
                 </TableCell>
               </TableRow>
             ))}
@@ -144,16 +178,16 @@ export default function EquipeInterna() {
           <div className="space-y-4 pt-2">
             <div className="space-y-2">
               <Label className="text-muted-foreground text-xs">Nome Completo</Label>
-              <Input placeholder="Ex: João da Silva" className="bg-muted border-border text-foreground" />
+              <Input value={formulario.nome} onChange={(e) => setFormulario({ ...formulario, nome: e.target.value })} placeholder="Ex: João da Silva" className="bg-muted border-border text-foreground" />
             </div>
             <div className="space-y-2">
               <Label className="text-muted-foreground text-xs">Email</Label>
-              <Input placeholder="joao@nexohub.com" className="bg-muted border-border text-foreground" />
+              <Input type="email" value={formulario.email} onChange={(e) => setFormulario({ ...formulario, email: e.target.value })} placeholder="joao@nexohub.com" className="bg-muted border-border text-foreground" />
             </div>
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-2">
                 <Label className="text-muted-foreground text-xs">Cargo</Label>
-                <Select>
+                <Select value={formulario.papel} onValueChange={(papel) => setFormulario({ ...formulario, papel: papel as Formulario["papel"] })}>
                   <SelectTrigger className="bg-muted border-border text-foreground">
                     <SelectValue placeholder="Selecione" />
                   </SelectTrigger>
@@ -167,7 +201,7 @@ export default function EquipeInterna() {
               </div>
               <div className="space-y-2">
                 <Label className="text-muted-foreground text-xs">Departamento</Label>
-                <Select>
+                <Select value={formulario.departamento} onValueChange={(departamento) => setFormulario({ ...formulario, departamento })}>
                   <SelectTrigger className="bg-muted border-border text-foreground">
                     <SelectValue placeholder="Selecione" />
                   </SelectTrigger>
@@ -182,12 +216,10 @@ export default function EquipeInterna() {
             </div>
             <Button
               className="w-full gradient-primary text-primary-foreground border-0"
-              onClick={() => {
-                setDialogAberto(false);
-                toast({ title: "Colaborador criado", description: "Novo membro adicionado à equipe." });
-              }}
+              disabled={criar.isPending}
+              onClick={aoCriar}
             >
-              Criar Colaborador
+              {criar.isPending ? "Criando..." : "Criar Colaborador"}
             </Button>
           </div>
         </DialogContent>

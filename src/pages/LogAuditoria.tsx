@@ -1,6 +1,8 @@
 import { useState } from "react";
 import { Search } from "lucide-react";
-import { registrosAuditoria } from "@/data/dadosMock";
+import { useAuditoria } from "@/api/recursos";
+import EstadoTabela from "@/components/EstadoTabela";
+import { formatarDataHora } from "@/lib/formatos";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
@@ -12,12 +14,23 @@ const rotulosAcao: Record<string, { rotulo: string; cor: string }> = {
   "usuario.excluido": { rotulo: "Exclusão", cor: "bg-destructive/10 text-destructive border-destructive/20" },
   "permissao.alterada": { rotulo: "Permissão", cor: "bg-warning/10 text-warning border-warning/20" },
   "usuario.senha_resetada": { rotulo: "Reset Senha", cor: "bg-primary/10 text-primary border-primary/20" },
+  "usuario.senha_redefinida": { rotulo: "Reset Senha", cor: "bg-primary/10 text-primary border-primary/20" },
+  "equipe.senha_redefinida": { rotulo: "Reset Senha", cor: "bg-primary/10 text-primary border-primary/20" },
+  "usuario.reativado": { rotulo: "Reativação", cor: "bg-success/10 text-success border-success/20" },
+  "inquilino.reativado": { rotulo: "Reativação", cor: "bg-success/10 text-success border-success/20" },
+  "equipe.criado": { rotulo: "Criação", cor: "bg-success/10 text-success border-success/20" },
+  "equipe.suspenso": { rotulo: "Suspensão", cor: "bg-destructive/10 text-destructive border-destructive/20" },
+  "equipe.reativado": { rotulo: "Reativação", cor: "bg-success/10 text-success border-success/20" },
+  "despesa.criada": { rotulo: "Gasto", cor: "bg-warning/10 text-warning border-warning/20" },
+  "despesa.cancelado": { rotulo: "Gasto", cor: "bg-muted text-muted-foreground border-border" },
+  "despesa.reativado": { rotulo: "Gasto", cor: "bg-warning/10 text-warning border-warning/20" },
   "plano.atualizado": { rotulo: "Upgrade", cor: "bg-success/10 text-success border-success/20" },
   "inquilino.criado": { rotulo: "Criação", cor: "bg-success/10 text-success border-success/20" },
 };
 
 export default function LogAuditoria() {
   const [busca, setBusca] = useState("");
+  const { data: registrosAuditoria = [], isLoading, error } = useAuditoria();
 
   const filtrados = registrosAuditoria.filter(
     (r) =>
@@ -58,12 +71,13 @@ export default function LogAuditoria() {
             </TableRow>
           </TableHeader>
           <TableBody>
+            <EstadoTabela colunas={7} carregando={isLoading} erro={error} vazio={filtrados.length === 0} />
             {filtrados.map((registro) => {
               const metaAcao = rotulosAcao[registro.acao] || { rotulo: registro.acao, cor: "bg-muted text-muted-foreground border-border" };
               return (
                 <TableRow key={registro.id} className="border-border/30 hover:bg-muted/30">
                   <TableCell className="text-xs text-muted-foreground whitespace-nowrap">
-                    {new Date(registro.dataHora).toLocaleString("pt-BR")}
+                    {formatarDataHora(registro.dataHora)}
                   </TableCell>
                   <TableCell>
                     <Badge variant="outline" className={`text-[10px] ${metaAcao.cor}`}>

@@ -1,30 +1,40 @@
 import { useState } from "react";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { Hexagon, Eye, EyeOff } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
+import { ApiError, modoDemonstracao, obterApiUrl } from "@/lib/http";
+import { destinoSeguro, entrar } from "@/lib/auth";
 
-interface EntrarProps {
-  aoEntrar: () => void;
-}
-
-export default function Entrar({ aoEntrar }: EntrarProps) {
+export default function Entrar() {
+  const navegar = useNavigate();
+  const [parametros] = useSearchParams();
   const [email, setEmail] = useState("");
   const [senha, setSenha] = useState("");
   const [mostrarSenha, setMostrarSenha] = useState(false);
+  const [manterConectado, setManterConectado] = useState(true);
+  const [carregando, setCarregando] = useState(false);
   const [erro, setErro] = useState("");
+  const demonstracao = modoDemonstracao();
 
-  const aoEnviar = (e: React.FormEvent) => {
+  const aoEnviar = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!email || !senha) {
       setErro("Preencha todos os campos");
       return;
     }
-    if (email === "admin@nexohub.com" && senha === "admin123") {
-      localStorage.setItem("nexohub_auth", "true");
-      aoEntrar();
-    } else {
-      setErro("Credenciais inválidas");
+    setCarregando(true);
+    setErro("");
+    try {
+      await entrar(email, senha, manterConectado);
+      navegar(destinoSeguro(parametros.get("voltar")), { replace: true });
+    } catch (falha) {
+      setErro(falha instanceof ApiError && falha.status === 401
+        ? "E-mail ou senha incorretos."
+        : falha instanceof Error ? falha.message : "Não foi possível entrar.");
+    } finally {
+      setCarregando(false);
     }
   };
 
@@ -43,21 +53,25 @@ export default function Entrar({ aoEntrar }: EntrarProps) {
 
         <form onSubmit={aoEnviar} className="glass-card rounded-xl p-6 space-y-5">
           <div className="space-y-2">
-            <Label className="text-xs text-muted-foreground">Email</Label>
+            <Label htmlFor="email" className="text-xs text-muted-foreground">Email</Label>
             <Input
+              id="email"
               type="email"
+              autoComplete="username"
               value={email}
               onChange={(e) => { setEmail(e.target.value); setErro(""); }}
-              placeholder="admin@nexohub.com"
+              placeholder="voce@nexohub.com"
               className="bg-muted border-border text-foreground placeholder:text-muted-foreground"
             />
           </div>
 
           <div className="space-y-2">
-            <Label className="text-xs text-muted-foreground">Senha</Label>
+            <Label htmlFor="senha" className="text-xs text-muted-foreground">Senha</Label>
             <div className="relative">
               <Input
+                id="senha"
                 type={mostrarSenha ? "text" : "password"}
+                autoComplete="current-password"
                 value={senha}
                 onChange={(e) => { setSenha(e.target.value); setErro(""); }}
                 placeholder="••••••••"
@@ -66,6 +80,7 @@ export default function Entrar({ aoEntrar }: EntrarProps) {
               <button
                 type="button"
                 onClick={() => setMostrarSenha(!mostrarSenha)}
+                aria-label={mostrarSenha ? "Ocultar senha" : "Mostrar senha"}
                 className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
               >
                 {mostrarSenha ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
@@ -73,16 +88,31 @@ export default function Entrar({ aoEntrar }: EntrarProps) {
             </div>
           </div>
 
+          <div className="flex items-center gap-2">
+            <input
+              type="checkbox"
+              id="manter-conectado"
+              checked={manterConectado}
+              onChange={(e) => setManterConectado(e.target.checked)}
+              className="w-4 h-4 rounded border-input"
+            />
+            <Label htmlFor="manter-conectado" className="text-xs font-normal text-muted-foreground cursor-pointer">
+              Manter conectado
+            </Label>
+          </div>
+
           {erro && (
-            <p className="text-xs text-destructive">{erro}</p>
+            <p role="alert" className="text-xs text-destructive">{erro}</p>
           )}
 
-          <Button type="submit" className="w-full gradient-primary text-primary-foreground border-0">
-            Entrar
+          <Button type="submit" disabled={carregando} className="w-full gradient-primary text-primary-foreground border-0">
+            {carregando ? "Entrando..." : "Entrar"}
           </Button>
 
-          <p className="text-[10px] text-muted-foreground text-center">
-            Use: admin@nexohub.com / admin123
+          <p className="text-[10px] text-muted-foreground text-center break-all">
+            {demonstracao
+              ? "Modo demonstração: qualquer senha entra (ex.: rafael@nexohub.com)"
+              : `Servidor: ${obterApiUrl()}`}
           </p>
         </form>
       </div>

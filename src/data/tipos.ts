@@ -10,6 +10,7 @@ export interface Inquilino {
   id: string;
   nome: string;
   slug: string;
+  cnpj?: string;
   planoId: string;
   status: "ativo" | "suspenso";
   qtdUsuarios: number;
@@ -26,7 +27,7 @@ export interface Usuario {
   email: string;
   papel: "admin" | "gerente" | "usuario";
   status: "ativo" | "suspenso";
-  ultimoLogin: string;
+  ultimoLogin: string | null;
   criadoEm: string;
 }
 
@@ -37,7 +38,7 @@ export interface UsuarioInterno {
   papel: "superadmin" | "admin" | "suporte" | "financeiro";
   departamento: string;
   status: "ativo" | "suspenso";
-  ultimoLogin: string;
+  ultimoLogin: string | null;
   criadoEm: string;
 }
 

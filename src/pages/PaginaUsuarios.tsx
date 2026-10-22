@@ -1,6 +1,8 @@
 import { useState } from "react";
 import { Search, MoreHorizontal, Ban, CheckCircle, KeyRound, UserPlus } from "lucide-react";
-import { usuarios, inquilinos } from "@/data/dadosMock";
+import { useAlterarStatus, useCriar, useInquilinos, useRedefinirSenha, useUsuarios, type NovoUsuario } from "@/api/recursos";
+import EstadoTabela from "@/components/EstadoTabela";
+import { formatarDataHora } from "@/lib/formatos";
 import BadgeStatus from "@/components/BadgeStatus";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Input } from "@/components/ui/input";
@@ -18,11 +20,30 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } f
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 
+// Papel começa vazio até ser escolhido; o backend recusa (422) se continuar vazio
+type Formulario = Omit<NovoUsuario, "papel"> & { papel: NovoUsuario["papel"] | "" };
+const FORMULARIO_VAZIO: Formulario = { nome: "", email: "", inquilinoId: "", papel: "" };
+
 export default function PaginaUsuarios() {
   const [busca, setBusca] = useState("");
   const [filtroInquilino, setFiltroInquilino] = useState("todos");
   const [dialogAberto, setDialogAberto] = useState(false);
+  const [formulario, setFormulario] = useState<Formulario>(FORMULARIO_VAZIO);
   const { toast } = useToast();
+  const { data: usuarios = [], isLoading, error } = useUsuarios();
+  const { data: inquilinos = [] } = useInquilinos();
+  const criar = useCriar("usuarios");
+  const alterarStatus = useAlterarStatus("usuarios");
+  const redefinirSenha = useRedefinirSenha("usuarios");
+
+  const aoCriar = () =>
+    criar.mutate(formulario as NovoUsuario, {
+      onSuccess: () => {
+        setDialogAberto(false);
+        setFormulario(FORMULARIO_VAZIO);
+        toast({ title: "Usuário criado", description: `${formulario.email} foi adicionado ao tenant.` });
+      },
+    });
 
   const filtrados = usuarios.filter((u) => {
     const correspondeABusca =
@@ -88,6 +109,7 @@ export default function PaginaUsuarios() {
             </TableRow>
           </TableHeader>
           <TableBody>
+            <EstadoTabela colunas={6} carregando={isLoading} erro={error} vazio={filtrados.length === 0} />
             {filtrados.map((u) => {
               const inquilino = obterInquilino(u.inquilinoId);
               return (
@@ -105,7 +127,7 @@ export default function PaginaUsuarios() {
                     </Badge>
                   </TableCell>
                   <TableCell className="text-xs text-muted-foreground">
-                    {new Date(u.ultimoLogin).toLocaleString("pt-BR")}
+                    {formatarDataHora(u.ultimoLogin, "Nunca")}
                   </TableCell>
                   <TableCell><BadgeStatus status={u.status} /></TableCell>
                   <TableCell>
@@ -116,16 +138,22 @@ export default function PaginaUsuarios() {
                         </Button>
                       </DropdownMenuTrigger>
                       <DropdownMenuContent align="end" className="bg-card border-border">
-                        <DropdownMenuItem onClick={() => toast({ title: "Reset enviado", description: `Email de reset enviado para ${u.email}` })}>
+                        <DropdownMenuItem onClick={() => redefinirSenha.mutate(u)}>
                           <KeyRound className="w-4 h-4 mr-2" /> Reset de Senha
                         </DropdownMenuItem>
                         <DropdownMenuSeparator className="bg-border" />
                         {u.status === "ativo" ? (
-                          <DropdownMenuItem className="text-destructive focus:text-destructive">
+                          <DropdownMenuItem
+                            className="text-destructive focus:text-destructive"
+                            onClick={() => alterarStatus.mutate({ id: u.id, status: "suspenso" })}
+                          >
                             <Ban className="w-4 h-4 mr-2" /> Suspender
                           </DropdownMenuItem>
                         ) : (
-                          <DropdownMenuItem className="text-success focus:text-success">
+                          <DropdownMenuItem
+                            className="text-success focus:text-success"
+                            onClick={() => alterarStatus.mutate({ id: u.id, status: "ativo" })}
+                          >
                             <CheckCircle className="w-4 h-4 mr-2" /> Reativar
                           </DropdownMenuItem>
                         )}
@@ -150,29 +178,29 @@ export default function PaginaUsuarios() {
           <div className="space-y-4 pt-2">
             <div className="space-y-2">
               <Label className="text-muted-foreground text-xs">Nome Completo</Label>
-              <Input placeholder="Ex: João da Silva" className="bg-muted border-border text-foreground" />
+              <Input value={formulario.nome} onChange={(e) => setFormulario({ ...formulario, nome: e.target.value })} placeholder="Ex: João da Silva" className="bg-muted border-border text-foreground" />
             </div>
             <div className="space-y-2">
               <Label className="text-muted-foreground text-xs">Email</Label>
-              <Input placeholder="joao@empresa.com.br" className="bg-muted border-border text-foreground" />
+              <Input type="email" value={formulario.email} onChange={(e) => setFormulario({ ...formulario, email: e.target.value })} placeholder="joao@empresa.com.br" className="bg-muted border-border text-foreground" />
             </div>
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-2">
                 <Label className="text-muted-foreground text-xs">Tenant</Label>
-                <Select>
+                <Select value={formulario.inquilinoId} onValueChange={(inquilinoId) => setFormulario({ ...formulario, inquilinoId })}>
                   <SelectTrigger className="bg-muted border-border text-foreground">
                     <SelectValue placeholder="Selecione" />
                   </SelectTrigger>
                   <SelectContent className="bg-card border-border">
-                    {inquilinos.map((i) => (
-                      <SelectItem key={i.id} value={i.id}>{i.nome}</SelectItem>
+                    {inquilinos.filter((i) => i.status === "ativo").map((i) => (
+                      <SelectItem key={i.id} value={i.id}>{i.nome} ({i.qtdUsuarios}/{i.maxUsuarios})</SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
               </div>
               <div className="space-y-2">
                 <Label className="text-muted-foreground text-xs">Papel</Label>
-                <Select>
+                <Select value={formulario.papel} onValueChange={(papel) => setFormulario({ ...formulario, papel: papel as Formulario["papel"] })}>
                   <SelectTrigger className="bg-muted border-border text-foreground">
                     <SelectValue placeholder="Selecione" />
                   </SelectTrigger>
@@ -186,12 +214,10 @@ export default function PaginaUsuarios() {
             </div>
             <Button
               className="w-full gradient-primary text-primary-foreground border-0"
-              onClick={() => {
-                setDialogAberto(false);
-                toast({ title: "Usuário criado", description: "O novo usuário foi adicionado ao tenant." });
-              }}
+              disabled={criar.isPending}
+              onClick={aoCriar}
             >
-              Criar Usuário
+              {criar.isPending ? "Criando..." : "Criar Usuário"}
             </Button>
           </div>
         </DialogContent>

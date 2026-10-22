@@ -4,15 +4,14 @@ import { useIsMobile } from "@/hooks/use-mobile";
 
 interface LayoutAppProps {
   children: ReactNode;
-  aoSair?: () => void;
 }
 
-export default function LayoutApp({ children, aoSair }: LayoutAppProps) {
+export default function LayoutApp({ children }: LayoutAppProps) {
   const eMobile = useIsMobile();
 
   return (
     <div className="min-h-screen bg-background">
-      <BarraLateral aoSair={aoSair} />
+      <BarraLateral />
       <main
         className={`transition-all duration-200 ${
           eMobile ? "p-4 pt-16" : "ml-[72px] p-8"

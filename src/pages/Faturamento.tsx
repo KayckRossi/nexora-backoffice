@@ -1,19 +1,23 @@
 import { TrendingUp, Receipt, Building2, DollarSign } from "lucide-react";
 import CartaoEstatistica from "@/components/CartaoEstatistica";
-import { inquilinos, planos } from "@/data/dadosMock";
+import { useInquilinos, usePlanos } from "@/api/recursos";
+import { formatarMoeda } from "@/lib/formatos";
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip, Legend } from "recharts";
 
 const CORES = ["hsl(217, 91%, 60%)", "hsl(263, 70%, 58%)", "hsl(142, 71%, 45%)"];
 
 export default function Faturamento() {
+  const { data: inquilinos = [] } = useInquilinos();
+  const { data: planos = [] } = usePlanos();
+
   const dadosFaturamento = inquilinos.map((i) => {
-    const plano = planos.find((p) => p.id === i.planoId)!;
-    return { ...i, nomePlano: plano.nome, precoPlano: plano.preco };
+    const plano = planos.find((p) => p.id === i.planoId);
+    return { ...i, nomePlano: plano?.nome ?? i.planoId, precoPlano: plano?.preco ?? 0 };
   });
 
   const dadosAtivos = dadosFaturamento.filter((d) => d.status === "ativo");
   const mrrTotal = dadosAtivos.reduce((acc, d) => acc + d.precoPlano, 0);
-  const receitaMediaPorInquilino = Math.round(mrrTotal / dadosAtivos.length);
+  const receitaMediaPorInquilino = dadosAtivos.length ? Math.round(mrrTotal / dadosAtivos.length) : 0;
 
   const receitaPorPlano = planos.map((plano) => {
     const receita = dadosAtivos
@@ -35,10 +39,10 @@ export default function Faturamento() {
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-        <CartaoEstatistica titulo="MRR Total" valor={`R$ ${mrrTotal.toLocaleString("pt-BR")}`} icone={TrendingUp} gradiente />
-        <CartaoEstatistica titulo="ARR Projetado" valor={`R$ ${(mrrTotal * 12).toLocaleString("pt-BR")}`} icone={Receipt} />
+        <CartaoEstatistica titulo="MRR Total" valor={formatarMoeda(mrrTotal)} icone={TrendingUp} gradiente />
+        <CartaoEstatistica titulo="ARR Projetado" valor={formatarMoeda(mrrTotal * 12)} icone={Receipt} />
         <CartaoEstatistica titulo="Tenants Ativos" valor={dadosAtivos.length} icone={Building2} />
-        <CartaoEstatistica titulo="Receita Média/Tenant" valor={`R$ ${receitaMediaPorInquilino}`} icone={DollarSign} />
+        <CartaoEstatistica titulo="Receita Média/Tenant" valor={formatarMoeda(receitaMediaPorInquilino)} icone={DollarSign} />
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
@@ -111,7 +115,7 @@ export default function Faturamento() {
                 <p className="text-sm font-medium text-foreground">{d.nome}</p>
                 <p className="text-xs text-muted-foreground">{d.nomePlano}</p>
               </div>
-              <p className="text-sm font-bold gradient-text">R$ {d.precoPlano.toLocaleString("pt-BR")}</p>
+              <p className="text-sm font-bold gradient-text">{formatarMoeda(d.precoPlano)}</p>
             </div>
           ))}
         </div>
