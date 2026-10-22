@@ -3,8 +3,8 @@ import react from "@vitejs/plugin-react-swc";
 import path from "path";
 import { readFileSync } from "fs";
 
-// Domínios de túnel aceitos pelo servidor de dev/preview (ngrok); o resto é bloqueado pelo Vite
-const HOSTS_TUNEL = [".ngrok-free.app", ".ngrok.app", ".ngrok.io", ".ngrok-free.dev"];
+// Domínios de túnel aceitos pelo servidor de dev/preview (ngrok e Cloudflare Tunnel); o resto é bloqueado pelo Vite
+const HOSTS_TUNEL = [".ngrok-free.app", ".ngrok.app", ".ngrok.io", ".ngrok-free.dev", ".trycloudflare.com"];
 
 // O preview serve os mesmos cabeçalhos de segurança (CSP etc.) do vercel.json, para testar antes do deploy
 const CABECALHOS_SEGURANCA: Record<string, string> = Object.fromEntries(
